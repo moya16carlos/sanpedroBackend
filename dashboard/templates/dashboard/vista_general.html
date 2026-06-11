@@ -1,0 +1,1511 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Vista General - San Pedro Conecta{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+    let mapaVistaGeneral = null;
+    let mapaInicializado = false;
+
+    function cambiarPestana(idPestana, elementoMenu) {
+        document.querySelectorAll('.pantalla').forEach(el => el.classList.add('hidden'));
+        const pantalla = document.getElementById(idPestana);
+        if (pantalla) pantalla.classList.remove('hidden');
+
+        document.querySelectorAll('.btn-menu-vista').forEach(el => {
+            el.classList.remove('bg-green-700', 'text-white', 'shadow');
+            el.classList.add('text-slate-700', 'bg-white');
+        });
+
+        elementoMenu.classList.remove('text-slate-700', 'bg-white');
+        elementoMenu.classList.add('bg-green-700', 'text-white', 'shadow');
+
+        if (idPestana === 'pantalla-mapa') {
+            setTimeout(() => {
+                inicializarMapaVistaGeneral();
+                if (mapaVistaGeneral) mapaVistaGeneral.invalidateSize();
+            }, 300);
+        }
+    }
+
+    function mostrarDestinoComunicaciones() {
+        const destino = document.getElementById('destinatario-comunicaciones')?.value;
+        const selectorSector = document.getElementById('selector-sector-comunicaciones');
+        const selectorOrganizacion = document.getElementById('selector-organizacion-comunicaciones');
+
+        if (!selectorSector || !selectorOrganizacion) return;
+
+        selectorSector.classList.add('hidden');
+        selectorOrganizacion.classList.add('hidden');
+
+        if (destino === 'sector') selectorSector.classList.remove('hidden');
+        if (destino === 'organizacion') selectorOrganizacion.classList.remove('hidden');
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="mb-8">
+    <div class="flex flex-wrap gap-2">
+
+        <button onclick="cambiarPestana('pantalla-global', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-green-700 text-white shadow font-bold text-sm transition">
+            📊 Panel Global
+        </button>
+
+        <button onclick="cambiarPestana('pantalla-mapa', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            🗺️ Mapa Territorial
+        </button>
+
+        <button onclick="cambiarPestana('pantalla-termometro', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            🌡️ Termómetro Social
+        </button>
+
+        <button onclick="cambiarPestana('pantalla-reportes', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            🚨 Reportes
+        </button>
+
+        <button onclick="cambiarPestana('pantalla-solicitudes', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            📝 Solicitudes
+        </button>
+
+        <button onclick="cambiarPestana('pantalla-organizaciones', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            🏢 Organizaciones
+        </button>
+
+        {% if acceso_funcionario and acceso_funcionario.permiso_comunicaciones or request.user.is_superuser %}
+        <button onclick="cambiarPestana('pantalla-comunicaciones', this)"
+                class="btn-menu-vista px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-green-50 font-bold text-sm transition">
+            📢 Comunicaciones
+        </button>
+        {% endif %}
+
+        <div class="px-4 py-2 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-amber-700 cursor-not-allowed font-bold text-sm">
+            🚧 Votaciones · Próximamente
+        </div>
+
+        <div class="px-4 py-2 rounded-lg border border-dashed border-amber-400 bg-amber-50 text-amber-700 cursor-not-allowed font-bold text-sm">
+            🚧 Proyectos · Próximamente
+        </div>
+
+    </div>
+</div>
+
+<div id="pantalla-global" class="pantalla block p-8">
+        <header class="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+          <div>
+            <h2 class="text-3xl font-bold text-slate-800 tracking-tight">Panel Global de Gestión</h2>
+            <p class="text-slate-500 mt-1">Rendimiento institucional y satisfacción ciudadana en tiempo real.</p>
+          </div>
+          <div class="flex items-center gap-3 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+            <div class="flex items-center gap-2 px-2">
+              <span class="text-sm font-bold text-slate-600">📅 Filtro:</span>
+              <select class="p-1.5 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-green-500">
+                <option>Mes: Mayo</option><option>Mes: Abril</option><option>Mes: Marzo</option>
+              </select>
+              <select class="p-1.5 bg-slate-50 border border-slate-300 rounded text-sm font-medium focus:outline-none focus:border-green-500">
+                <option>Año: 2026</option><option>Año: 2025</option>
+              </select>
+            </div>
+            <button class="bg-green-600 text-white p-2 rounded hover:bg-green-700 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 border-l-4 border-l-blue-500">
+            <div class="p-3 bg-blue-50 text-blue-600 rounded-lg text-2xl">📱</div>
+            <div>
+              <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Usuarios App</p>
+              <p class="text-3xl font-bold text-slate-800">{{ total_usuarios }}</p>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center gap-4 border-l-4 border-l-purple-500">
+            <div class="p-3 bg-purple-50 text-purple-600 rounded-lg text-2xl">🏢</div>
+            <div>
+              <p class="text-sm text-slate-500 font-semibold uppercase tracking-wider">Organizaciones Registradas</p>
+              <p class="text-3xl font-bold text-slate-800">{{ total_organizaciones }}</p>
+            </div>
+          </div>
+          <div class="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 shadow-sm flex items-center justify-between text-white">
+            <div>
+              <p class="text-sm text-green-100 font-semibold uppercase tracking-wider">Nota Promedio Comunal</p>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-4xl font-bold">6.4</span>
+                <span class="text-lg text-green-200">/ 7.0</span>
+              </div>
+            </div>
+            <div class="text-4xl">😊</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div class="flex justify-between items-center mb-6">
+              <h3 class="text-lg font-bold text-slate-800">Rendimiento: Estado de Reportes</h3>
+              <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded font-bold">Total: {{ total_reportes }}</span>
+            </div>
+            <div class="h-48 flex items-end justify-around gap-2 mt-4 pb-2 border-b-2 border-slate-100 relative">
+              <div class="absolute w-full border-t border-slate-100 top-0"></div>
+              <div class="absolute w-full border-t border-slate-100 top-12"></div>
+              <div class="absolute w-full border-t border-slate-100 top-24"></div>
+              <div class="flex flex-col items-center z-10 w-1/4">
+                <span class="text-xs font-bold text-slate-500 mb-1">{{ resueltos }}</span>
+                <div class="w-full bg-blue-500 rounded-t-md h-36"></div>
+                <span class="text-sm font-bold text-slate-700 mt-2">Resueltos (R)</span>
+              </div>
+              <div class="flex flex-col items-center z-10 w-1/4">
+                <span class="text-xs font-bold text-slate-500 mb-1">{{ en_proceso }}</span>
+                <div class="w-full bg-amber-400 rounded-t-md h-16"></div>
+                <span class="text-sm font-bold text-slate-700 mt-2">En Curso (C)</span>
+              </div>
+              <div class="flex flex-col items-center z-10 w-1/4">
+                <span class="text-xs font-bold text-slate-500 mb-1">{{ pendientes }}</span>
+                <div class="w-full bg-red-400 rounded-t-md h-8"></div>
+                <span class="text-sm font-bold text-slate-700 mt-2">Pendientes (P)</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 mt-4 text-center">Tiempos de respuesta dentro de los márgenes institucionales.</p>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Satisfacción del Vecino</h3>
+            <p class="text-xs text-slate-500 mb-6">Evaluación (Nota 1 a 7) asignada por el usuario al cerrar su reporte.</p>
+            <div class="flex flex-col md:flex-row items-center gap-8">
+              <div class="relative w-40 h-40 rounded-full border-8 border-slate-50 flex items-center justify-center" style="background: conic-gradient(#10b981 0% 75%, #fbbf24 75% 90%, #ef4444 90% 100%);">
+                <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-inner">
+                  <span class="text-2xl font-bold text-slate-800">{{ total_reportes }}</span>
+                </div>
+              </div>
+              <div class="flex-1 space-y-4 w-full">
+                <div class="bg-slate-50 p-3 rounded border-l-4 border-green-500">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-slate-700 flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-500"></div> Óptimo (Verde)</span>
+                    <span class="font-bold text-green-600">75%</span>
+                  </div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded border-l-4 border-amber-400">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-slate-700 flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-amber-400"></div> Regular (Amarillo)</span>
+                    <span class="font-bold text-amber-500">15%</span>
+                  </div>
+                </div>
+                <div class="bg-slate-50 p-3 rounded border-l-4 border-red-500">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-slate-700 flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-500"></div> Crítico (Rojo)</span>
+                    <span class="font-bold text-red-500">10%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div id="pantalla-mapa" class="pantalla hidden p-8 h-full flex flex-col">
+        <header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800">Mapa Territorial</h2>
+                <p class="text-slate-500">Reportes ciudadanos georreferenciados por estado municipal.</p>
+            </div>
+
+            <div class="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                <span class="text-sm font-bold text-slate-600">Total puntos:</span>
+                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
+                    {{ puntos_mapa|length }}
+                </span>
+            </div>
+        </header>
+
+        <div class="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col lg:flex-row min-h-[650px]">
+
+            <div class="flex-1 relative min-h-[500px]">
+                <div id="mapaVistaGeneral" class="w-full h-full min-h-[650px]"></div>
+            </div>
+
+            <div class="w-full lg:w-[430px] bg-white border-l border-slate-200 overflow-y-auto">
+                <div class="sticky top-0 bg-white z-10 p-5 border-b border-slate-200">
+                    <h3 class="font-bold text-slate-800 text-lg">
+                        Categorías de Reporte
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Íconos y descripción utilizados para clasificar los puntos del mapa.
+                    </p>
+                </div>
+
+                <div class="p-5 space-y-5">
+                    {% regroup categorias_reporte by grupo as categorias_por_grupo %}
+
+                    {% for grupo in categorias_por_grupo %}
+                    <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                        <div class="px-4 py-2 text-xs font-bold uppercase tracking-wide
+                            {% if 'Agua' in grupo.grouper %}bg-cyan-50 text-cyan-800
+                            {% elif 'Municipalidad' in grupo.grouper %}bg-green-50 text-green-800
+                            {% else %}bg-slate-100 text-slate-700{% endif %}">
+                            {{ grupo.grouper }}
+                        </div>
+
+                        <div class="divide-y divide-slate-100">
+                            {% for categoria in grupo.list %}
+                            <div class="flex items-start gap-3 p-4 hover:bg-slate-50 transition">
+                                <div
+                                    class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg"
+                                    style="background-color: {{ categoria.color|default:'#64748b' }};"
+                                >
+                                    {{ categoria.icono }}
+                                </div>
+
+                                <div>
+                                    <p class="font-bold text-sm text-slate-800 leading-tight">
+                                        {{ categoria.nombre }}
+                                    </p>
+                                    <p class="text-xs text-slate-500 mt-1 leading-snug">
+                                        {{ categoria.descripcion }}
+                                    </p>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded text-sm text-slate-500">
+                        No hay categorías configuradas.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pantalla-termometro" class="pantalla hidden p-8">
+      <header class="mb-8">
+          <h2 class="text-3xl font-bold text-slate-800">Termómetro Social</h2>
+          <p class="text-slate-500">
+              Monitoreo de necesidades ciudadanas, sectores críticos y relación con organizaciones sociales.
+          </p>
+      </header>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                  <span>📱</span> Top solicitudes / incidentes vía App
+              </h3>
+
+              <div class="space-y-3">
+                  {% for tipo, cantidad in top_tipos_reportes %}
+                  <div class="flex justify-between items-center p-3 bg-blue-50 rounded border border-blue-100">
+                      <span class="font-medium text-slate-700">
+                          {{ forloop.counter }}. {{ tipo }}
+                      </span>
+
+                      <span class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-sm font-bold">
+                          {{ cantidad }}
+                      </span>
+                  </div>
+                  {% empty %}
+                  <p class="text-sm text-slate-500">
+                      No hay datos suficientes para mostrar solicitudes frecuentes.
+                  </p>
+                  {% endfor %}
+              </div>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                  <span>⚠️</span> Reportes críticos recientes
+              </h3>
+
+              <p class="text-xs text-slate-500 mb-4">
+                  Reportes no resueltos que requieren seguimiento municipal.
+              </p>
+
+              <div class="space-y-4">
+                  {% for reporte in reportes_criticos %}
+                  <div class="flex items-start gap-3 p-3 hover:bg-slate-50 rounded transition border-l-4 border-red-500">
+                      <div>
+                          <p class="font-bold text-slate-800">
+                              REP-{{ reporte.id }} · {{ reporte.titulo|default:"Sin título" }}
+                          </p>
+
+                          <p class="text-xs text-slate-500 mt-0.5">
+                              Estado: <strong>{{ reporte.estado_municipio|default:"Sin estado" }}</strong>
+                              · Tipo: {{ reporte.tipo|default:"Sin tipo" }}
+                          </p>
+
+                          <p class="text-xs text-slate-500 mt-1">
+                              {{ reporte.descripcion|default:"Sin descripción"|truncatechars:120 }}
+                          </p>
+
+                          <a href="{% url 'dashboard_reporte_detalle' reporte.id %}"
+                            class="inline-block mt-2 text-xs font-bold text-blue-600 hover:underline">
+                              Ver detalle
+                          </a>
+                      </div>
+                  </div>
+                  {% empty %}
+                  <p class="text-sm text-slate-500">
+                      No hay reportes críticos pendientes.
+                  </p>
+                  {% endfor %}
+              </div>
+          </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+          <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+              <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <span>🤝</span> Relación directa con organizaciones sociales
+              </h3>
+
+              <span class="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-bold">
+                  {{ total_organizaciones }} organizaciones registradas
+              </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="border border-slate-200 rounded-lg overflow-hidden">
+                  <div class="bg-blue-50 text-blue-800 font-bold p-3 border-b border-slate-200 text-center">
+                      Organizaciones registradas
+                  </div>
+
+                  <ul class="p-4 space-y-3">
+                      {% for org in organizaciones %}
+                      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <span class="text-sm text-slate-600 font-medium">
+                              🏢 {{ org.nombre }}
+                          </span>
+
+                          <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">
+                              {{ org.tipo|default:"Sin tipo" }}
+                          </span>
+                      </li>
+                      {% empty %}
+                      <li class="text-sm text-slate-500">
+                          No hay organizaciones registradas.
+                      </li>
+                      {% endfor %}
+                  </ul>
+              </div>
+
+              <div class="border border-slate-200 rounded-lg overflow-hidden">
+                  <div class="bg-emerald-50 text-emerald-800 font-bold p-3 border-b border-slate-200 text-center">
+                      Sectores con mayor movimiento
+                  </div>
+
+                  <ul class="p-4 space-y-3">
+                      {% for sector, cantidad in top_sectores %}
+                      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <span class="text-sm text-slate-600 font-medium">
+                              📍 {{ sector }}
+                          </span>
+
+                          <span class="text-emerald-600 font-bold">
+                              {{ cantidad }} reportes
+                          </span>
+                      </li>
+                      {% empty %}
+                      <li class="text-sm text-slate-500">
+                          No hay sectores con reportes registrados.
+                      </li>
+                      {% endfor %}
+                  </ul>
+              </div>
+          </div>
+      </div>
+  </div>
+      
+
+        <div id="pantalla-reportes" class="pantalla hidden max-w-6xl mx-auto pb-20 p-8">
+          <header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+              <div>
+                  <h2 class="text-3xl font-bold text-slate-800">Recepción y Auditoría de Reportes</h2>
+                  <p class="text-slate-500">Últimos incidentes ciudadanos registrados en San Pedro Conecta.</p>
+              </div>
+
+              <div class="bg-white px-4 py-2 rounded shadow-sm border border-slate-200">
+                  <span class="text-sm font-bold text-slate-600">
+                      Total reportes: {{ total_reportes }}
+                  </span>
+              </div>
+          </header>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[850px] flex flex-col">
+                  <div class="bg-slate-100 p-4 border-b border-slate-200 font-bold text-slate-700">
+                      📥 Bandeja de Entrada
+                  </div>
+
+                  <div class="flex-1 overflow-y-auto p-3 space-y-3">
+                      {% for reporte in ultimos_reportes %}
+                      <a href="{% url 'dashboard_reporte_detalle' reporte.id %}"
+                        class="block p-3 border-l-4 
+                        {% if reporte.estado_municipio and 'RESUELTO' in reporte.estado_municipio %}border-green-500 bg-green-50
+                        {% elif reporte.estado_municipio and 'PROCESO' in reporte.estado_municipio %}border-blue-500 bg-blue-50
+                        {% else %}border-amber-500 bg-amber-50{% endif %}
+                        rounded shadow-sm hover:bg-slate-50 transition">
+
+                          <div class="flex justify-between items-start mb-1">
+                              <span class="text-xs font-bold text-slate-700">
+                                  {{ reporte.tipo|default:"Incidente" }}
+                              </span>
+
+                              <span class="bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
+                                  {{ reporte.estado_municipio|default:"SIN ESTADO" }}
+                              </span>
+                          </div>
+
+                          <p class="text-sm font-bold text-slate-800 truncate">
+                              REP-{{ reporte.id }} · {{ reporte.titulo|default:"Sin título" }}
+                          </p>
+
+                          <p class="text-xs text-slate-600 truncate mt-1">
+                              {{ reporte.descripcion|default:"Sin descripción" }}
+                          </p>
+
+                          <div class="flex justify-between items-center mt-2">
+                              <span class="text-[10px] text-slate-500">
+                                  {{ reporte.fecha_creacion }}
+                              </span>
+
+                              <span class="text-[10px] font-mono text-slate-400">
+                                  ID {{ reporte.id }}
+                              </span>
+                          </div>
+                      </a>
+                      {% empty %}
+                      <p class="text-sm text-slate-500 text-center py-8">
+                          No hay reportes registrados.
+                      </p>
+                      {% endfor %}
+                  </div>
+              </div>
+
+              <div class="lg:col-span-2 space-y-4">
+
+                  {% with reporte=ultimos_reportes.0 %}
+                  {% if reporte %}
+                  <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 pb-4 border-b border-slate-100 gap-4">
+                          <div class="flex items-center gap-3">
+                              <h3 class="text-xl font-bold text-slate-800">Último Incidente Registrado</h3>
+
+                              <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                  {{ reporte.estado_municipio|default:"SIN ESTADO" }}
+                              </span>
+                          </div>
+
+                          <div class="flex gap-2">
+                              <input type="text" value="REP-{{ reporte.id }}" disabled
+                                    class="w-28 p-1.5 text-center text-sm font-mono font-bold bg-slate-100 border border-slate-200 rounded text-slate-600">
+
+                              <input type="text" value="{{ reporte.fecha_creacion }}" disabled
+                                    class="w-44 p-1.5 text-center text-sm font-mono bg-slate-100 border border-slate-200 rounded text-slate-600">
+                          </div>
+                      </div>
+
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                          <div>
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Tipo de Incidente
+                              </label>
+                              <p class="text-slate-800 font-medium">
+                                  {{ reporte.tipo|default:"Sin tipo" }}
+                              </p>
+                          </div>
+
+                          <div>
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Estado Validación
+                              </label>
+                              <p class="text-slate-800 font-medium">
+                                  {{ reporte.estado_validacion|default:"-" }}
+                              </p>
+                          </div>
+
+                          <div>
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Emitido Por
+                              </label>
+                              <p class="text-slate-800 font-medium flex items-center gap-2">
+                                  <span class="text-lg">👤</span>
+                                  {% if reporte.autor_id %}
+                                      Usuario ID {{ reporte.autor_id }}
+                                  {% else %}
+                                      Visitante / Sin autor
+                                  {% endif %}
+                              </p>
+                          </div>
+
+                          <div>
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Ubicación GPS
+                              </label>
+
+                              {% if reporte.latitud and reporte.longitud %}
+                                  <p class="text-slate-800 font-medium">
+                                      📍 {{ reporte.latitud }}, {{ reporte.longitud }}
+                                  </p>
+                              {% else %}
+                                  <p class="text-slate-500">Sin ubicación registrada</p>
+                              {% endif %}
+                          </div>
+
+                          <div class="md:col-span-2">
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Título
+                              </label>
+                              <p class="text-slate-800 font-bold">
+                                  {{ reporte.titulo|default:"Sin título" }}
+                              </p>
+                          </div>
+
+                          <div class="md:col-span-2">
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  Descripción del Ciudadano
+                              </label>
+                              <p class="text-slate-700 bg-slate-50 p-3 rounded border border-slate-100">
+                                  {{ reporte.descripcion|default:"Sin descripción" }}
+                              </p>
+                          </div>
+
+                          {% if reporte.foto_url %}
+                          <div class="md:col-span-2">
+                              <label class="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                  Evidencia Fotográfica
+                              </label>
+
+                              <img src="{{ reporte.foto_url }}"
+                                  class="w-full max-h-80 object-cover rounded-lg border border-slate-200 shadow-sm">
+                          </div>
+                          {% endif %}
+                      </div>
+
+                      <div class="flex flex-wrap gap-2 pt-4 border-t border-slate-200">
+                          <a href="{% url 'dashboard_reporte_detalle' reporte.id %}"
+                            class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">
+                              Ver detalle completo
+                          </a>
+
+                          {% if reporte.latitud and reporte.longitud %}
+                          <a href="https://www.google.com/maps?q={{ reporte.latitud }},{{ reporte.longitud }}"
+                            target="_blank"
+                            class="bg-green-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-green-700">
+                              Ver en mapa
+                          </a>
+                          {% endif %}
+                      </div>
+                  </div>
+                  {% else %}
+                  <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
+                      No hay reportes para mostrar.
+                  </div>
+                  {% endif %}
+                  {% endwith %}
+
+              </div>
+          </div>
+      </div>
+
+      <div id="pantalla-solicitudes" class="pantalla hidden max-w-6xl mx-auto pb-20 p-8">
+        <header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800">Solicitudes de Servicio</h2>
+                <p class="text-slate-500">Peticiones ciudadanas registradas desde la aplicación.</p>
+            </div>
+
+            <div class="bg-white px-4 py-2 rounded shadow-sm border border-slate-200">
+                <span class="text-sm font-bold text-slate-600">
+                    Total solicitudes: {{ solicitudes_servicio|length }}
+                </span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[850px] flex flex-col">
+                <div class="bg-slate-100 p-4 border-b border-slate-200 font-bold text-slate-700">
+                    📥 Bandeja de Solicitudes
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3 space-y-3">
+                    {% for solicitud in solicitudes_servicio %}
+                    <a href="{% url 'dashboard_reporte_detalle' solicitud.id %}"
+                      class="block p-3 border-l-4 
+                      {% if solicitud.estado_municipio and 'RESUELTO' in solicitud.estado_municipio %}border-green-500 bg-green-50
+                      {% elif solicitud.estado_municipio and 'PROCESO' in solicitud.estado_municipio %}border-blue-500 bg-blue-50
+                      {% else %}border-amber-500 bg-amber-50{% endif %}
+                      rounded shadow-sm hover:bg-slate-50 transition">
+
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-bold text-slate-700">
+                                {{ solicitud.tipo|default:"Solicitud" }}
+                            </span>
+
+                            <span class="bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
+                                {{ solicitud.estado_municipio|default:"SIN ESTADO" }}
+                            </span>
+                        </div>
+
+                        <p class="text-sm font-bold text-slate-800 truncate">
+                            SOL-{{ solicitud.id }} · {{ solicitud.titulo|default:"Sin título" }}
+                        </p>
+
+                        <p class="text-xs text-slate-600 truncate mt-1">
+                            {{ solicitud.descripcion|default:"Sin descripción" }}
+                        </p>
+
+                        <div class="flex justify-between items-center mt-2">
+                            <span class="text-[10px] text-slate-500">
+                                {{ solicitud.fecha_creacion }}
+                            </span>
+
+                            <span class="text-[10px] font-mono text-slate-400">
+                                ID {{ solicitud.id }}
+                            </span>
+                        </div>
+                    </a>
+                    {% empty %}
+                    <p class="text-sm text-slate-500 text-center py-8">
+                        No hay solicitudes de servicio registradas.
+                    </p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+
+                {% with solicitud=solicitudes_servicio.0 %}
+                {% if solicitud %}
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 pb-4 border-b border-slate-100 gap-4">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-xl font-bold text-slate-800">Última Solicitud Registrada</h3>
+
+                            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                {{ solicitud.estado_municipio|default:"SIN ESTADO" }}
+                            </span>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <input type="text" value="SOL-{{ solicitud.id }}" disabled
+                                  class="w-28 p-1.5 text-center text-sm font-mono font-bold bg-slate-100 border border-slate-200 rounded text-slate-600">
+
+                            <input type="text" value="{{ solicitud.fecha_creacion }}" disabled
+                                  class="w-44 p-1.5 text-center text-sm font-mono bg-slate-100 border border-slate-200 rounded text-slate-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Tipo de Servicio
+                            </label>
+                            <p class="text-slate-800 font-medium">
+                                {{ solicitud.tipo|default:"Sin tipo" }}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Estado Validación
+                            </label>
+                            <p class="text-slate-800 font-medium">
+                                {{ solicitud.estado_validacion|default:"-" }}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Solicitante
+                            </label>
+                            <p class="text-slate-800 font-medium flex items-center gap-2">
+                                <span class="text-lg">👤</span>
+                                {% if solicitud.autor_id %}
+                                    Usuario ID {{ solicitud.autor_id }}
+                                {% else %}
+                                    Visitante / Sin autor
+                                {% endif %}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Ubicación GPS
+                            </label>
+
+                            {% if solicitud.latitud and solicitud.longitud %}
+                                <p class="text-slate-800 font-medium">
+                                    📍 {{ solicitud.latitud }}, {{ solicitud.longitud }}
+                                </p>
+                            {% else %}
+                                <p class="text-slate-500">Sin ubicación registrada</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Título
+                            </label>
+                            <p class="text-slate-800 font-bold">
+                                {{ solicitud.titulo|default:"Sin título" }}
+                            </p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                Detalle solicitado
+                            </label>
+                            <p class="text-slate-700 bg-slate-50 p-3 rounded border border-slate-100">
+                                {{ solicitud.descripcion|default:"Sin descripción" }}
+                            </p>
+                        </div>
+
+                        {% if solicitud.foto_url %}
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                Evidencia / Fotografía
+                            </label>
+
+                            <img src="{{ solicitud.foto_url }}"
+                                class="w-full max-h-80 object-cover rounded-lg border border-slate-200 shadow-sm">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 pt-4 border-t border-slate-200">
+                        <a href="{% url 'dashboard_reporte_detalle' solicitud.id %}"
+                          class="bg-blue-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-blue-700">
+                            Ver detalle completo
+                        </a>
+
+                        {% if solicitud.latitud and solicitud.longitud %}
+                        <a href="https://www.google.com/maps?q={{ solicitud.latitud }},{{ solicitud.longitud }}"
+                          target="_blank"
+                          class="bg-green-600 text-white px-4 py-2 rounded font-bold shadow hover:bg-green-700">
+                            Ver en mapa
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
+                    No hay solicitudes de servicio para mostrar.
+                </div>
+                {% endif %}
+                {% endwith %}
+
+            </div>
+        </div>
+    </div>
+
+      <div id="pantalla-votaciones" class="pantalla hidden p-8 space-y-8 pb-24">
+        <header class="mb-6">
+          <h2 class="text-3xl font-bold text-slate-800">Votaciones y Consultas Ciudadanas</h2>
+          <p class="text-slate-500 text-sm">Publica encuestas y proyectos a votación directa en los teléfonos de los vecinos. (Acceso exclusivo Perfil Alcaldía).</p>
+        </header>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-4xl">
+          <div class="flex items-center gap-2 mb-6 pb-2 border-b border-slate-100">
+            <span class="text-xl">📝</span>
+            <h3 class="font-bold text-lg text-slate-800">Crear Nueva Consulta</h3>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-slate-700 text-sm font-bold mb-2">ID Votación</label>
+              <input type="text" value="VOT-2026-015" disabled class="w-full p-2 border border-slate-300 bg-slate-100 rounded text-slate-500 font-mono">
+            </div>
+            <div>
+              <label class="block text-slate-700 text-sm font-bold mb-2">Departamento Patrocinador</label>
+              <select class="w-full p-2 border border-slate-300 rounded focus:border-green-600">
+                <option>Alcaldía</option>
+                <option>SECPLA (Secretaría Comunal de Planificación)</option>
+                <option>DIDECO</option>
+                <option>Dirección de Obras Municipales (DOM)</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-slate-700 text-sm font-bold mb-2">Público Objetivo (¿Quiénes pueden votar?)</label>
+              <select class="w-full p-2 border border-slate-300 rounded focus:border-green-600 font-medium text-slate-800">
+                <optgroup label="📢 Plebiscitos / Consultas Globales">
+                  <option class="text-green-700 font-bold">🗳️ Toda la Comuna (Votación Abierta)</option>
+                </optgroup>
+                <optgroup label="📍 Consultas Sectoriales">
+                  <option>Sector: El Yali (Solo residentes del sector)</option>
+                  <option>Sector: Lo Encañado (Solo residentes del sector)</option>
+                </optgroup>
+                <optgroup label="🏢 Consultas Cerradas a Organizaciones">
+                  <option>Solo Presidentes de Juntas de Vecinos</option>
+                  <option>Junta de Vecinos El Yali</option>
+                </optgroup>
+              </select>
+              <p class="text-xs text-slate-400 mt-1">La app verificará el RUT y perfil del usuario para habilitar el botón de voto.</p>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-slate-700 text-sm font-bold mb-2">Título de la Votación</label>
+              <input type="text" placeholder="Ej: Elección del diseño para la nueva plaza central" class="w-full p-2 border border-slate-300 rounded focus:border-green-600">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-slate-700 text-sm font-bold mb-2">Descripción / Contexto</label>
+              <textarea rows="3" placeholder="Explique brevemente de qué trata la consulta y por qué es importante la participación ciudadana..." class="w-full p-3 border border-slate-300 rounded focus:border-green-600"></textarea>
+            </div>
+            <div class="md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <label class="block text-slate-700 text-sm font-bold mb-3">Opciones Disponibles para Votar</label>
+              <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-500 w-6 text-center">1.</span>
+                  <input type="text" placeholder="Ej: Proyecto A - Diseño moderno con juegos de agua" class="flex-1 p-2 border border-slate-300 rounded focus:border-green-600">
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-slate-500 w-6 text-center">2.</span>
+                  <input type="text" placeholder="Ej: Proyecto B - Diseño clásico con más áreas verdes" class="flex-1 p-2 border border-slate-300 rounded focus:border-green-600">
+                </div>
+              </div>
+              <button class="mt-3 text-sm text-blue-600 font-bold hover:text-blue-800">+ Agregar otra opción</button>
+            </div>
+            <div>
+              <label class="block text-slate-700 text-sm font-bold mb-2">Fecha Apertura de Urnas</label>
+              <input type="datetime-local" class="w-full p-2 border border-slate-300 rounded focus:border-green-600">
+            </div>
+            <div>
+              <label class="block text-slate-700 text-sm font-bold mb-2">Fecha Cierre de Votación</label>
+              <input type="datetime-local" class="w-full p-2 border border-slate-300 rounded focus:border-green-600">
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 max-w-5xl overflow-hidden">
+          <div class="bg-slate-800 px-6 py-4 text-white flex justify-between items-center">
+            <div>
+              <h3 class="font-bold text-lg flex items-center gap-2">📜 Histórico de Consultas</h3>
+              <p class="text-slate-400 text-xs mt-0.5">Registro de encuestas y plebiscitos realizados en la aplicación.</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm whitespace-nowrap">
+              <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-xs border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">ID Votación</th>
+                  <th class="py-3 px-4">Título</th>
+                  <th class="py-3 px-4">Público Objetivo</th>
+                  <th class="py-3 px-4">Estado</th>
+                  <th class="py-3 px-4 bg-green-50/50 text-green-800">👤 Autor (Usuario)</th>
+                </tr>
+              </thead>
+              <tbody class="text-slate-700 divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50 transition">
+                  <td class="py-3 px-4 font-mono text-xs font-bold text-slate-900">VOT-2026-014</td>
+                  <td class="py-3 px-4 font-medium text-slate-800">Renovación Luminarias Fase 1</td>
+                  <td class="py-3 px-4 text-slate-600">Toda la Comuna</td>
+                  <td class="py-3 px-4"><span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">ACTIVA (En curso)</span></td>
+                  <td class="py-3 px-4 bg-green-50/30 font-bold text-slate-900">12.345.678-9 (Alcalde)</td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition opacity-75">
+                  <td class="py-3 px-4 font-mono text-xs font-bold text-slate-900">VOT-2026-013</td>
+                  <td class="py-3 px-4 font-medium text-slate-800">Priorización Presupuesto Participativo</td>
+                  <td class="py-3 px-4 text-slate-600">Sector: El Yali</td>
+                  <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">CERRADA</span></td>
+                  <td class="py-3 px-4 bg-green-50/30 font-bold text-slate-900">15.456.789-K (SECPLA)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="fixed bottom-0 right-0 left-64 bg-white border-t border-slate-300 p-4 shadow-lg flex justify-center md:justify-end gap-3 z-10">
+          <button class="bg-blue-600 text-white px-5 py-2 rounded shadow hover:bg-blue-700 font-semibold">➕ Nueva Votación</button>
+          <button class="bg-slate-500 text-white px-5 py-2 rounded shadow hover:bg-slate-600 font-semibold">📝 Guardar Borrador</button>
+          <button class="bg-orange-500 text-white px-5 py-2 rounded shadow hover:bg-orange-600 font-semibold">⏰ Programar</button>
+          <button class="bg-green-600 text-white px-8 py-2 rounded shadow hover:bg-green-700 font-bold flex items-center gap-2">
+            🚀 Publicar Votación Ahora
+          </button>
+        </div>
+      </div>
+
+      <div id="pantalla-proyectos" class="pantalla hidden max-w-6xl mx-auto pb-24 p-8">
+        
+        <header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+          <div>
+            <h2 class="text-3xl font-bold text-amber-600 flex items-center gap-2"><span>🏗️</span> Gestión de Proyectos Comunales</h2>
+            <p class="text-slate-500 mt-1">Cree y actualice el ciclo de vida de los proyectos. Esta información es pública en la App San Pedro Conecta.</p>
+          </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden h-[850px] flex flex-col">
+            <div class="bg-slate-100 p-4 border-b border-slate-200 font-bold text-slate-700 flex justify-between items-center">
+              <span>📚 Cartera de Proyectos</span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-3 space-y-3">
+              <div class="p-3 border-l-4 border-blue-500 bg-blue-50 rounded shadow-sm cursor-pointer border border-blue-100">
+                <div class="flex justify-between items-start mb-1">
+                  <span class="text-xs font-bold text-blue-800">PMU-2026-04</span>
+                  <span class="bg-blue-200 text-blue-800 text-[9px] px-1.5 py-0.5 rounded font-bold">LICITACIÓN</span>
+                </div>
+                <p class="text-sm font-bold text-slate-700 mt-1">Renovación Luminarias</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">📝 Ficha del Proyecto</h3>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                <div class="md:col-span-1">
+                  <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Cód. Proyecto (BIP, PMU)</label>
+                  <input type="text" placeholder="Ej: PMU-4509" value="PMU-2026-04" class="w-full p-2 border border-slate-300 rounded focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-mono text-amber-700 font-bold bg-amber-50">
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre Oficial del Proyecto</label>
+                  <input type="text" placeholder="Ej: Construcción Nueva Plaza..." value="Renovación Luminarias Fase 1" class="w-full p-2 border border-slate-300 rounded font-bold text-slate-800">
+                </div>
+              </div>
+
+              <div class="bg-amber-50 p-5 rounded-lg border border-amber-200 mb-6">
+                <h4 class="font-bold text-amber-800 mb-4 text-sm uppercase tracking-wide">Ciclo de Vida y Avance</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label class="block text-xs font-bold text-amber-700 mb-2">Etapa Actual</label>
+                    <select class="w-full p-2 border border-amber-300 rounded font-bold text-slate-700 bg-white">
+                      <option class="text-blue-600">3. Licitación Pública</option>
+                      <option>5. En Ejecución (Obras)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-amber-700 mb-2">Porcentaje de Avance Físico</label>
+                    <div class="flex items-center gap-3">
+                      <input type="range" min="0" max="100" value="0" class="w-full accent-amber-600" oninput="document.getElementById('avance-proy').textContent = this.value + '%'">
+                      <span id="avance-proy" class="font-bold text-amber-800 w-12 text-right">0%</span>
+                    </div>
+                  </div>
+                  <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-amber-700 mb-2">Observaciones de la Etapa</label>
+                    <textarea rows="2" placeholder="Detalle los avances..." class="w-full p-2 border border-amber-300 rounded bg-white">Publicado en portal Mercado Público.</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition cursor-pointer">
+                  <span class="text-3xl mb-2">🖼️</span>
+                  <p class="text-sm font-bold text-slate-700">Subir Render / Foto</p>
+                  <p class="text-xs text-slate-500 text-center mt-1">Formato JPG/PNG.</p>
+                </div>
+                <div class="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition cursor-pointer">
+                  <span class="text-3xl mb-2">📄</span>
+                  <p class="text-sm font-bold text-slate-700">Adjuntar Documento PDF</p>
+                  <p class="text-xs text-slate-500 text-center mt-1">Planos, Bases de Licitación.</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between pt-4 border-t border-slate-200">
+                <button class="bg-red-500 text-white px-5 py-2 rounded font-bold border border-red-600 hover:bg-red-600 flex items-center gap-1 shadow-sm transition">
+                  🗑️ Eliminar Proyecto
+                </button>
+                <div class="flex gap-2">
+                  <button class="bg-white text-slate-600 px-5 py-2 rounded font-bold border border-slate-300 hover:bg-slate-50">Limpiar Ficha</button>
+                  <button onclick="guardarProyecto()" class="bg-amber-500 text-white px-8 py-2 rounded font-bold shadow-md hover:bg-amber-600 flex items-center gap-2">
+                    🚀 Guardar y Publicar en App
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="pantalla-organizaciones" class="pantalla hidden p-8">
+
+        <header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800">Organizaciones Sociales</h2>
+                <p class="text-gray-600 text-sm">
+                    Registro de organizaciones sociales vinculadas a la plataforma.
+                </p>
+            </div>
+
+            <div class="bg-white px-4 py-2 rounded shadow-sm border border-slate-200">
+                <span class="text-sm font-bold text-slate-600">
+                    Total organizaciones: {{ total_organizaciones }}
+                </span>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-purple-500">
+                <p class="text-sm text-slate-500 font-bold uppercase">Organizaciones</p>
+                <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_organizaciones }}</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-green-500">
+                <p class="text-sm text-slate-500 font-bold uppercase">Sectores</p>
+                <p class="text-4xl font-bold text-slate-800 mt-2">{{ sectores|length }}</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+                <p class="text-sm text-slate-500 font-bold uppercase">Usuarios App</p>
+                <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_usuarios }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="bg-slate-800 px-6 py-4 text-white flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg flex items-center gap-2">
+                        🏢 Listado de Organizaciones
+                    </h3>
+                    <p class="text-slate-400 text-xs mt-0.5">
+                        Información proveniente de la base de datos.
+                    </p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-xs border-b border-gray-200">
+                        <tr>
+                            <th class="py-3 px-4">ID</th>
+                            <th class="py-3 px-4">Organización</th>
+                            <th class="py-3 px-4">Tipo</th>
+                            <th class="py-3 px-4">RUT</th>
+                            <th class="py-3 px-4">Sector ID</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="text-gray-700 divide-y divide-gray-100">
+                        {% for org in organizaciones %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 font-mono text-xs font-bold text-slate-900">
+                                {{ org.id }}
+                            </td>
+
+                            <td class="py-3 px-4 font-bold text-slate-800">
+                                🏢 {{ org.nombre|default:"Sin nombre" }}
+                            </td>
+
+                            <td class="py-3 px-4">
+                                <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs font-bold">
+                                    {{ org.tipo|default:"Sin tipo" }}
+                                </span>
+                            </td>
+
+                            <td class="py-3 px-4 font-mono text-xs">
+                                {{ org.rut|default:"-" }}
+                            </td>
+
+                            <td class="py-3 px-4">
+                                {% if org.sector_id %}
+                                    <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">
+                                        Sector {{ org.sector_id }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-slate-400">Sin sector</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-slate-500">
+                                No hay organizaciones registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    
+
+
+
+    <div id="pantalla-comunicaciones" class="pantalla hidden space-y-8 pb-24 p-8">
+
+      <header class="mb-6">
+          <h2 class="text-2xl font-bold text-gray-800">Centro de Comunicaciones</h2>
+          <p class="text-gray-600 text-sm">
+              Historial de notificaciones enviadas desde el panel administrativo.
+          </p>
+      </header>
+     
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+              <p class="text-sm text-slate-500 font-bold uppercase">Total comunicaciones</p>
+              <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_notificaciones }}</p>
+          </div>
+
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-green-500">
+              <p class="text-sm text-slate-500 font-bold uppercase">Últimas registradas</p>
+              <p class="text-4xl font-bold text-slate-800 mt-2">{{ notificaciones|length }}</p>
+          </div>
+
+          <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-purple-500">
+              <p class="text-sm text-slate-500 font-bold uppercase">Origen</p>
+              <p class="text-xl font-bold text-slate-800 mt-3">Panel Admin</p>
+          </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow border border-gray-200 max-w-6xl overflow-hidden">
+          <div class="bg-slate-800 px-6 py-4 text-white flex justify-between items-center">
+              <div>
+                  <h3 class="font-bold text-lg flex items-center gap-2">📜 Histórico de Comunicaciones</h3>
+                  <p class="text-slate-400 text-xs mt-0.5">
+                      Registro completo de notificaciones emitidas desde San Pedro Conecta.
+                  </p>
+              </div>
+
+              <span class="bg-slate-700 text-xs px-3 py-1 rounded-full font-mono text-slate-300">
+                  Total: {{ total_notificaciones }}
+              </span>
+          </div>
+
+           <div class="bg-white p-6 rounded-lg shadow border border-gray-200 max-w-4xl">
+      <h3 class="font-bold text-lg mb-4">📢 Nueva notificación</h3>
+
+      <form method="post" action="{% url 'dashboard_admin_panel' %}">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="enviar_notificacion">
+
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+              Destinatarios
+          </label>
+
+          <select id="destinatario-comunicaciones"
+                  name="destinatario"
+                  onchange="mostrarDestinoComunicaciones()"
+                  class="w-full p-2 border border-gray-300 rounded mb-4 bg-white focus:border-green-600">
+
+              <option value="todos">Todos los usuarios</option>
+              <option value="sector">Por sector</option>
+              <option value="organizacion">Por organización</option>
+          </select>
+
+          <div id="selector-sector-comunicaciones" class="hidden mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Sector
+              </label>
+
+              <select name="sector_id"
+                      class="w-full p-2 border border-gray-300 rounded bg-white focus:border-green-600">
+                  <option value="">Seleccione un sector</option>
+
+                  {% for sector in sectores %}
+                      <option value="{{ sector.id }}">
+                          {{ sector.nombre }}
+                      </option>
+                  {% endfor %}
+              </select>
+          </div>
+
+          <div id="selector-organizacion-comunicaciones" class="hidden mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2">
+                  Organización
+              </label>
+
+              <select name="organizacion_id"
+                      class="w-full p-2 border border-gray-300 rounded bg-white focus:border-green-600">
+                  <option value="">Seleccione una organización</option>
+
+                  {% for org in organizaciones %}
+                      <option value="{{ org.id }}">
+                          {{ org.nombre }}
+                      </option>
+                  {% endfor %}
+              </select>
+          </div>
+
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+              Título
+          </label>
+
+          <input type="text"
+                name="titulo"
+                required
+                placeholder="Ej: Aviso municipal"
+                class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-green-600">
+
+          <label class="block text-gray-700 text-sm font-bold mb-2">
+              Mensaje
+          </label>
+
+          <textarea name="mensaje"
+                    rows="4"
+                    required
+                    placeholder="Escribe el mensaje para los vecinos..."
+                    class="w-full p-3 border border-gray-300 rounded mb-4 focus:border-green-600"></textarea>
+
+          <button class="bg-green-600 text-white px-8 py-2 rounded shadow hover:bg-green-700 font-bold">
+              🚀 Enviar notificación
+          </button>
+
+          <p class="text-xs text-slate-400 mt-3">
+              Interfaz lista. En el siguiente paso conectamos Firebase Admin SDK para envío real.
+          </p>
+      </form>
+  </div>
+
+          <div class="overflow-x-auto">
+              <table class="min-w-full text-left text-sm whitespace-nowrap">
+                  <thead class="bg-slate-100 text-slate-600 uppercase font-semibold text-xs border-b border-gray-200">
+                      <tr>
+                          <th class="py-3 px-4">ID / Fecha</th>
+                          <th class="py-3 px-4">Grupo objetivo</th>
+                          <th class="py-3 px-4">Título</th>
+                          <th class="py-3 px-4">Mensaje enviado</th>
+                          <th class="py-3 px-4">Destinatarios</th>
+                          <th class="py-3 px-4">Enviados</th>
+                          <th class="py-3 px-4">Errores</th>
+                      </tr>
+                  </thead>
+
+                  <tbody class="text-gray-700 divide-y divide-gray-100 font-normal">
+                      {% for noti in notificaciones %}
+                      <tr class="hover:bg-slate-50 transition">
+                          <td class="py-3 px-4">
+                              <div class="font-mono text-xs font-bold text-slate-900">
+                                  COM-{{ noti.id }}
+                              </div>
+                              <div class="text-xs text-gray-400 mt-0.5">
+                                  {{ noti.fecha }}
+                              </div>
+                          </td>
+
+                         <td class="py-3 px-4">
+
+                            {% if noti.destinatario == 'todos' %}
+                                <span class="text-red-700 font-bold">
+                                    🚨 Toda la comuna
+                                </span>
+
+                            {% elif noti.destinatario == 'sector' %}
+                                <span class="text-blue-700 font-bold">
+                                    📍 {{ noti.destino_nombre }}
+                                </span>
+
+                            {% elif noti.destinatario == 'organizacion' %}
+                                <span class="text-purple-700 font-bold">
+                                    🏢 {{ noti.destino_nombre }}
+                                </span>
+
+                            {% else %}
+                                <span class="text-slate-700">
+                                    {{ noti.destino_nombre }}
+                                </span>
+                            {% endif %}
+
+                        </td>
+
+                          <td class="py-3 px-4 font-bold text-slate-800">
+                              {{ noti.titulo|default:"Sin título" }}
+                          </td>
+
+                          <td class="py-3 px-4 max-w-xs truncate text-gray-500"
+                              title="{{ noti.mensaje }}">
+                              {{ noti.mensaje|default:"Sin mensaje" }}
+                          </td>
+
+                          <td class="py-3 px-4 font-bold">
+                              {{ noti.total_destinatarios|default:0 }}
+                          </td>
+
+                          <td class="py-3 px-4 text-green-700 font-bold">
+                              {{ noti.enviados|default:0 }}
+                          </td>
+
+                          <td class="py-3 px-4 text-red-700 font-bold">
+                              {{ noti.errores|default:0 }}
+                          </td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                          <td colspan="7" class="py-8 text-center text-slate-500">
+                              No hay comunicaciones registradas todavía.
+                          </td>
+                      </tr>
+                      {% endfor %}
+                  </tbody>
+              </table>
+          </div>
+      </div>
+
+     </div>
+
+    
+
+{{ puntos_mapa|json_script:"puntos-mapa-data" }}
+
+<script>
+function inicializarMapaVistaGeneral() {
+    const contenedor = document.getElementById('mapaVistaGeneral');
+    const datosMapa = document.getElementById('puntos-mapa-data');
+
+    if (!contenedor || !datosMapa) {
+        console.log('No existe el contenedor o los datos del mapa.');
+        return;
+    }
+
+    if (mapaInicializado && mapaVistaGeneral) {
+        mapaVistaGeneral.invalidateSize();
+        return;
+    }
+
+    const puntos = JSON.parse(datosMapa.textContent || '[]');
+
+    mapaVistaGeneral = L.map('mapaVistaGeneral').setView([-33.89, -71.46], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenStreetMap'
+    }).addTo(mapaVistaGeneral);
+
+    function escapeHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function colorEstado(estado) {
+        const texto = String(estado || '').toUpperCase();
+
+        if (texto.includes('RESUELTO')) return '#16a34a';
+        if (texto.includes('PROCESO')) return '#2563eb';
+        if (texto.includes('PENDIENTE') || texto.includes('NO_ENVIADO')) return '#f59e0b';
+        return '#64748b';
+    }
+
+    puntos.forEach((punto) => {
+        const colorCategoria = punto.color_categoria || '#64748b';
+        const icono = punto.icono || '📍';
+        const estado = punto.estado || 'SIN ESTADO';
+
+        const iconoCategoria = L.divIcon({
+            className: '',
+            html: `
+                <div style="
+                    background:${colorCategoria};
+                    color:white;
+                    width:42px;
+                    height:42px;
+                    border-radius:50%;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:21px;
+                    border:3px solid white;
+                    box-shadow:0 4px 12px rgba(15,23,42,0.35);
+                ">
+                    ${escapeHtml(icono)}
+                </div>
+            `,
+            iconSize: [42, 42],
+            iconAnchor: [21, 21],
+            popupAnchor: [0, -22]
+        });
+
+        const marker = L.marker([punto.latitud, punto.longitud], {
+            icon: iconoCategoria
+        }).addTo(mapaVistaGeneral);
+
+        marker.bindPopup(`
+            <div style="min-width:270px; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <div style="
+                        background:${colorCategoria};
+                        width:42px;
+                        height:42px;
+                        border-radius:50%;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        color:white;
+                        font-size:21px;
+                        box-shadow:0 2px 7px rgba(0,0,0,0.25);
+                    ">
+                        ${escapeHtml(icono)}
+                    </div>
+
+                    <div>
+                        <strong style="font-size:14px; color:#0f172a;">
+                            ${escapeHtml(punto.categoria || punto.tipo || 'Sin categoría')}
+                        </strong><br>
+                        <small style="color:#64748b; font-weight:600;">
+                            REP-${escapeHtml(punto.id)}
+                        </small>
+                    </div>
+                </div>
+
+                <div style="font-weight:700; color:#1e293b; margin-bottom:8px;">
+                    ${escapeHtml(punto.titulo || 'Sin título')}
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:8px; margin-bottom:9px; font-size:12px; color:#475569;">
+                    ${escapeHtml(punto.descripcion_categoria || 'Sin descripción de categoría.')}
+                </div>
+
+                <div style="font-size:12px; margin-bottom:4px;">
+                    <strong>Estado:</strong>
+                    <span style="
+                        background:${colorEstado(estado)}20;
+                        color:${colorEstado(estado)};
+                        padding:2px 7px;
+                        border-radius:999px;
+                        font-weight:700;
+                    ">
+                        ${escapeHtml(estado)}
+                    </span>
+                </div>
+
+                <div style="font-size:12px; color:#475569; margin-bottom:12px;">
+                    <strong>Tipo original:</strong> ${escapeHtml(punto.tipo || 'Sin tipo')}
+                </div>
+
+                <a href="/dashboard/reportes/${escapeHtml(punto.id)}/"
+                   style="color:#2563eb; font-weight:700; text-decoration:none;">
+                    Ver detalle del reporte →
+                </a>
+            </div>
+        `);
+    });
+
+    if (puntos.length > 0) {
+        const bounds = puntos.map(p => [p.latitud, p.longitud]);
+        mapaVistaGeneral.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    mapaInicializado = true;
+
+    setTimeout(() => {
+        mapaVistaGeneral.invalidateSize();
+    }, 500);
+}
+</script>
+
+
+
+{% endblock %}

@@ -1,0 +1,228 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Reportes - San Pedro Conecta{% endblock %}
+
+{% block content %}
+
+<header class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Reportes ciudadanos</h2>
+        <p class="text-slate-500">Gestión y revisión de reportes recibidos desde la app.</p>
+    </div>
+
+    <div class="bg-white px-4 py-2 rounded-xl shadow-sm border">
+        <span class="text-sm font-bold text-slate-600">
+            Total reportes: {{ reportes|length }}
+        </span>
+    </div>
+</header>
+
+<form method="get" class="bg-white p-4 rounded-xl shadow-sm border mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+
+    <input
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="Buscar por categoría, descripción o vecino..."
+        class="md:col-span-2 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+    >
+
+    <select name="estado" class="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-green-500">
+        <option value="">Todos los estados</option>
+        <option value="NO_ENVIADO" {% if estado == 'NO_ENVIADO' %}selected{% endif %}>No enviado</option>
+        <option value="RECIBIDO" {% if estado == 'RECIBIDO' %}selected{% endif %}>Recibido</option>
+        <option value="PROCESO" {% if estado == 'PROCESO' %}selected{% endif %}>En proceso</option>
+        <option value="RESUELTO" {% if estado == 'RESUELTO' %}selected{% endif %}>Resuelto</option>
+    </select>
+
+    <button class="bg-green-600 text-white px-5 rounded font-bold hover:bg-green-700">
+        Filtrar
+    </button>
+</form>
+
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+            <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                <tr>
+                    <th class="py-3 px-4">Folio</th>
+                    <th class="py-3 px-4">Categoría</th>
+                    <th class="py-3 px-4">Descripción</th>
+                    <th class="py-3 px-4">Vecino</th>
+                    <th class="py-3 px-4">Origen</th>
+                    <th class="py-3 px-4">Validación</th>
+                    <th class="py-3 px-4">Municipio</th>
+                    <th class="py-3 px-4">Ubicación</th>
+                    <th class="py-3 px-4">Foto</th>
+                    <th class="py-3 px-4">Acción</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-100">
+                {% for reporte in reportes %}
+                <tr class="hover:bg-slate-50">
+
+                    <td class="py-3 px-4 font-mono font-bold text-slate-700">
+                        REP-{{ reporte.id }}
+                        <div class="text-[10px] text-slate-400 font-normal mt-1">
+                            {{ reporte.fecha_creacion|date:"d/m/Y H:i" }}
+                        </div>
+                    </td>
+
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-slate-800">
+                            {% if reporte.titulo == 'Luminarias / Alumbrado' %}
+                                💡 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Caminos y Calles' %}
+                                🛣️ {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Microbasurales / Aseo' %}
+                                🗑️ {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Seguridad Ciudadana' %}
+                                🛡️ {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Ruidos Molestos' %}
+                                🔊 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Fuga de Agua / Rotura de Matriz' %}
+                                💧 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Corte de Suministro' %}
+                                🚱 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Baja Presión' %}
+                                🌊 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Calidad del Agua (Turbiedad)' %}
+                                🟤 {{ reporte.titulo }}
+                            {% elif reporte.titulo == 'Solicitud Camión Aljibe' %}
+                                🚚 {{ reporte.titulo }}
+                            {% else %}
+                                ⋯ {{ reporte.titulo|default:"Otro" }}
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <td class="py-3 px-4 max-w-xs">
+                        <p class="text-slate-700 truncate" title="{{ reporte.descripcion }}">
+                            {{ reporte.descripcion|default:"Sin descripción" }}
+                        </p>
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.autor %}
+                            <div class="font-bold text-slate-700">
+                                {{ reporte.autor.nombre|default:"Sin nombre" }}
+                            </div>
+                            <div class="text-xs text-slate-400">
+                                {{ reporte.autor.rut|default:"Sin RUT" }}
+                            </div>
+                        {% else %}
+                            <span class="text-slate-400 text-xs">Visitante</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.tipo == 'Municipalidad' %}
+                            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">
+                                Municipalidad
+                            </span>
+                        {% elif reporte.tipo == 'APR' %}
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">
+                                APR
+                            </span>
+                        {% else %}
+                            <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">
+                                {{ reporte.tipo|default:"Sin origen" }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.estado_validacion == 'VALIDADO' %}
+                            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">
+                                VALIDADO
+                            </span>
+                        {% elif reporte.estado_validacion == 'RECHAZADO' %}
+                            <span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">
+                                RECHAZADO
+                            </span>
+                        {% elif reporte.estado_validacion == 'PENDIENTE_DIRIGENTE' %}
+                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold">
+                                PENDIENTE DIRIGENTE
+                            </span>
+                        {% else %}
+                            <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs font-bold">
+                                {{ reporte.estado_validacion|default:"PENDIENTE" }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.estado_municipio == 'RESUELTO' %}
+                            <span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">
+                                RESUELTO
+                            </span>
+                        {% elif reporte.estado_municipio == 'EN_PROCESO' or reporte.estado_municipio == 'PROCESO' %}
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">
+                                EN PROCESO
+                            </span>
+                        {% elif reporte.estado_municipio == 'NO_ENVIADO' %}
+                            <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">
+                                NO ENVIADO
+                            </span>
+                        {% else %}
+                            <span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs font-bold">
+                                {{ reporte.estado_municipio|default:"RECIBIDO" }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.latitud and reporte.longitud %}
+                            <a
+                                href="https://www.google.com/maps?q={{ reporte.latitud }},{{ reporte.longitud }}"
+                                target="_blank"
+                                class="text-blue-600 font-bold text-xs hover:underline"
+                            >
+                                Ver mapa
+                            </a>
+                        {% else %}
+                            <span class="text-slate-400 text-xs">Sin GPS</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        {% if reporte.foto_firmada %}
+                            <a href="{{ reporte.foto_firmada }}" target="_blank">
+                                <img
+                                    src="{{ reporte.foto_firmada }}"
+                                    class="w-16 h-16 object-cover rounded border shadow-sm"
+                                >
+                            </a>
+                        {% elif reporte.foto_url %}
+                            <a href="{{ reporte.foto_url }}" target="_blank" class="text-blue-600 text-xs font-bold">
+                                Abrir foto
+                            </a>
+                        {% else %}
+                            <span class="text-slate-400 text-xs">Sin foto</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-4">
+                        <a
+                            href="{% url 'dashboard_reporte_detalle' reporte.id %}"
+                            class="bg-blue-600 text-white px-3 py-1 rounded font-bold hover:bg-blue-700"
+                        >
+                            Detalle
+                        </a>
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="py-8 text-center text-slate-500">
+                        No hay reportes registrados.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

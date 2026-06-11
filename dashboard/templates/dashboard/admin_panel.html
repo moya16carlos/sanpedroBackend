@@ -1,0 +1,846 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Panel Administrativo - San Pedro Conecta{% endblock %}
+
+{% block extra_head %}
+<script>
+    function cambiarPestana(idPestana, elementoMenu) {
+        document.querySelectorAll('.pantalla-admin').forEach(el => el.classList.add('hidden'));
+        document.getElementById(idPestana).classList.remove('hidden');
+
+        document.querySelectorAll('.btn-admin').forEach(el => {
+            el.classList.remove('bg-green-700', 'text-white');
+            el.classList.add('bg-white', 'text-slate-700');
+        });
+
+        elementoMenu.classList.remove('bg-white', 'text-slate-700');
+        elementoMenu.classList.add('bg-green-700', 'text-white');
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+
+<header class="mb-8">
+    <h2 class="text-3xl font-bold text-slate-800">Panel Administrativo</h2>
+    <p class="text-slate-500 mt-1">Gestión interna de usuarios, sectores, organizaciones y notificaciones.</p>
+</header>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+        <p class="text-sm text-slate-500 font-bold uppercase">Usuarios App</p>
+        <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_usuarios_app }}</p>
+        <p class="text-xs text-slate-400 mt-2">Vecinos registrados</p>
+    </div>
+
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-green-500">
+        <p class="text-sm text-slate-500 font-bold uppercase">Sectores</p>
+        <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_sectores }}</p>
+        <p class="text-xs text-slate-400 mt-2">Sectores configurados</p>
+    </div>
+
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-purple-500">
+        <p class="text-sm text-slate-500 font-bold uppercase">Dispositivos</p>
+        <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_dispositivos|default:0 }}</p>
+        <p class="text-xs text-slate-400 mt-2">Celulares registrados para push</p>
+    </div>
+</div>
+
+<div class="flex flex-wrap gap-3 mb-6">
+    <button onclick="cambiarPestana('pantalla-usuarios-app', this)"
+            class="btn-admin bg-green-700 text-white px-4 py-2 rounded-lg font-bold shadow">
+        📱 Usuarios App
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-estadisticas', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        📊 Estadísticas
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-sectores', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        🗺️ Sectores
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-organizaciones', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        🏢 Organizaciones
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-notificaciones', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        📢 Notificaciones
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-integraciones', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        🔗 Integraciones
+    </button>
+
+    <button onclick="cambiarPestana('pantalla-logs', this)"
+            class="btn-admin bg-white text-slate-700 px-4 py-2 rounded-lg font-bold shadow border">
+        📊 Logs
+    </button>
+</div>
+
+<div id="pantalla-usuarios-app" class="pantalla-admin block">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">📱 Usuarios App</h3>
+                <p class="text-sm text-slate-500">Vecinos registrados en San Pedro Conecta.</p>
+            </div>
+
+            <input type="text"
+                   placeholder="Buscar por nombre, RUT o correo..."
+                   class="w-full md:w-96 p-2 border border-slate-300 rounded-lg">
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+                <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-3 px-4">ID</th>
+                        <th class="py-3 px-4">Datos editables</th>
+                        <th class="py-3 px-4">Estado</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-100">
+                    {% for usuario in usuarios_app %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-mono">{{ usuario.id }}</td>
+
+                        <td class="py-3 px-4">
+                            <form method="post" class="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+                                {% csrf_token %}
+                                <input type="hidden" name="accion" value="editar_usuario_app">
+                                <input type="hidden" name="usuario_id" value="{{ usuario.id }}">
+
+                                <input type="text"
+                                       name="nombre"
+                                       value="{{ usuario.nombre|default:'' }}"
+                                       class="p-2 border border-slate-300 rounded"
+                                       placeholder="Nombre">
+
+                                <input type="email"
+                                       name="email"
+                                       value="{{ usuario.email|default:'' }}"
+                                       class="p-2 border border-slate-300 rounded"
+                                       placeholder="Email">
+
+                                <input type="text"
+                                       name="telefono"
+                                       value="{{ usuario.telefono|default:'' }}"
+                                       class="p-2 border border-slate-300 rounded"
+                                       placeholder="Teléfono">
+
+                                <select name="sector_id" class="p-2 border border-slate-300 rounded bg-white">
+                                    <option value="">Sin sector</option>
+                                    {% for sector in sectores %}
+                                        <option value="{{ sector.id }}" {% if usuario.sector_id == sector.id %}selected{% endif %}>
+                                            {{ sector.nombre }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+
+                                <select name="identidad_validada" class="p-2 border border-slate-300 rounded bg-white">
+                                    <option value="false" {% if not usuario.identidad_validada %}selected{% endif %}>No validada</option>
+                                    <option value="true" {% if usuario.identidad_validada %}selected{% endif %}>Validada</option>
+                                </select>
+
+                                <button class="bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-blue-700">
+                                    Guardar
+                                </button>
+                            </form>
+
+                            <div class="text-xs text-slate-500 mt-2">
+                                <strong>RUT:</strong> {{ usuario.rut|default:"-" }}
+                                · <strong>Auth:</strong> {{ usuario.metodo_auth|default:"APP" }}
+
+                                <a href="{% url 'dashboard_usuario_detalle' usuario.id %}"
+                                   class="inline-block mt-2 bg-slate-700 text-white px-3 py-1 rounded text-xs font-bold hover:bg-slate-800">
+                                    Ver perfil
+                                </a>
+                            </div>
+                        </td>
+
+                        <td class="py-3 px-4">
+                            {% if usuario.identidad_validada %}
+                                <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Sí</span>
+                            {% else %}
+                                <span class="bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold">No</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="py-6 text-center text-slate-500">No hay usuarios registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="pantalla-estadisticas" class="pantalla-admin hidden">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+            <p class="text-sm text-slate-500 font-bold uppercase">Usuarios App</p>
+            <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_usuarios_app }}</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-green-500">
+            <p class="text-sm text-slate-500 font-bold uppercase">Sectores</p>
+            <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_sectores }}</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-purple-500">
+            <p class="text-sm text-slate-500 font-bold uppercase">Reportes</p>
+            <p class="text-4xl font-bold text-slate-800 mt-2">{{ total_reportes }}</p>
+        </div>
+
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 border-l-4 border-l-amber-500">
+            <p class="text-sm text-slate-500 font-bold uppercase">Pendientes</p>
+            <p class="text-4xl font-bold text-amber-500 mt-2">{{ reportes_pendientes }}</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Resumen operativo</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-5">
+                <p class="text-sm font-bold text-blue-700 uppercase">En proceso</p>
+                <p class="text-3xl font-bold text-blue-700 mt-2">{{ reportes_en_proceso }}</p>
+            </div>
+
+            <div class="bg-green-50 border border-green-100 rounded-xl p-5">
+                <p class="text-sm font-bold text-green-700 uppercase">Resueltos</p>
+                <p class="text-3xl font-bold text-green-700 mt-2">{{ reportes_resueltos }}</p>
+            </div>
+
+            <div class="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                <p class="text-sm font-bold text-slate-700 uppercase">Total reportes</p>
+                <p class="text-3xl font-bold text-slate-800 mt-2">{{ total_reportes }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pantalla-sectores" class="pantalla-admin hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-lg mb-4">Gestión de Sector</h3>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="crear_sector">
+
+                <label class="block text-sm font-bold mb-1">Nombre del sector</label>
+                <input type="text" name="nombre_sector" placeholder="Ej: El Yali"
+                       class="w-full p-2 border border-slate-300 rounded mb-4">
+
+                <button class="w-full bg-green-600 text-white py-2 rounded font-bold">
+                    ➕ Crear sector
+                </button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg">🗺️ Sectores configurados</h3>
+                <p class="text-sm text-slate-500">Crear, editar y eliminar sectores.</p>
+            </div>
+
+            <table class="min-w-full text-left text-sm">
+                <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-3 px-4">ID</th>
+                        <th class="py-3 px-4">Nombre</th>
+                        <th class="py-3 px-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-100">
+                    {% for sector in sectores %}
+                    <tr>
+                        <td class="py-3 px-4 font-mono">{{ sector.id }}</td>
+
+                        <td class="py-3 px-4">
+                            <form method="post" class="flex gap-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="accion" value="editar_sector">
+                                <input type="hidden" name="sector_id" value="{{ sector.id }}">
+
+                                <input type="text"
+                                       name="nombre_sector"
+                                       value="{{ sector.nombre }}"
+                                       class="flex-1 p-2 border border-slate-300 rounded">
+
+                                <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">
+                                    Guardar
+                                </button>
+                            </form>
+                        </td>
+
+                        <td class="py-3 px-4 text-right">
+                            <form method="post" onsubmit="return confirm('¿Eliminar este sector?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="accion" value="eliminar_sector">
+                                <input type="hidden" name="sector_id" value="{{ sector.id }}">
+
+                                <button class="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="py-6 text-center text-slate-500">No hay sectores registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="pantalla-organizaciones" class="pantalla-admin hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-lg mb-4">Crear organización</h3>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="crear_organizacion">
+
+                <label class="block text-sm font-bold mb-1">Nombre</label>
+                <input type="text" name="nombre" placeholder="Ej: Junta de Vecinos El Sauce"
+                       class="w-full p-2 border border-slate-300 rounded mb-4">
+
+                <label class="block text-sm font-bold mb-1">Tipo</label>
+                <input type="text" name="tipo" placeholder="Ej: Junta de Vecinos"
+                       class="w-full p-2 border border-slate-300 rounded mb-4">
+
+                <label class="block text-sm font-bold mb-1">RUT organización</label>
+                <input type="text" name="rut" placeholder="Ej: 65.123.456-7"
+                       class="w-full p-2 border border-slate-300 rounded mb-4">
+
+                <label class="block text-sm font-bold mb-1">Sector</label>
+                <select name="sector_id" class="w-full p-2 border border-slate-300 rounded mb-4 bg-white">
+                    <option value="">Sin sector</option>
+                    {% for sector in sectores %}
+                        <option value="{{ sector.id }}">{{ sector.nombre }}</option>
+                    {% endfor %}
+                </select>
+
+                <button class="w-full bg-green-600 text-white py-2 rounded font-bold">
+                    ➕ Crear organización
+                </button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-lg">🏢 Organizaciones registradas</h3>
+                <p class="text-sm text-slate-500">Crear, editar y eliminar organizaciones sociales.</p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                        <tr>
+                            <th class="py-3 px-4">ID</th>
+                            <th class="py-3 px-4">Datos</th>
+                            <th class="py-3 px-4 text-right">Acción</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100">
+                        {% for org in organizaciones %}
+                        <tr>
+                            <td class="py-3 px-4 font-mono">{{ org.id }}</td>
+
+                            <td class="py-3 px-4">
+                                <form method="post" class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="accion" value="editar_organizacion">
+                                    <input type="hidden" name="organizacion_id" value="{{ org.id }}">
+
+                                    <input type="text"
+                                           name="nombre"
+                                           value="{{ org.nombre }}"
+                                           class="p-2 border border-slate-300 rounded"
+                                           placeholder="Nombre">
+
+                                    <input type="text"
+                                           name="tipo"
+                                           value="{{ org.tipo }}"
+                                           class="p-2 border border-slate-300 rounded"
+                                           placeholder="Tipo">
+
+                                    <input type="text"
+                                           name="rut"
+                                           value="{{ org.rut }}"
+                                           class="p-2 border border-slate-300 rounded"
+                                           placeholder="RUT">
+
+                                    <select name="sector_id" class="p-2 border border-slate-300 rounded bg-white">
+                                        <option value="">Sin sector</option>
+                                        {% for sector in sectores %}
+                                            <option value="{{ sector.id }}" {% if org.sector_id == sector.id %}selected{% endif %}>
+                                                {{ sector.nombre }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <button class="md:col-span-4 bg-blue-600 text-white px-3 py-2 rounded text-xs font-bold hover:bg-blue-700">
+                                        Guardar cambios
+                                    </button>
+                                </form>
+                            </td>
+
+                            <td class="py-3 px-4 text-right">
+                                <form method="post" onsubmit="return confirm('¿Eliminar esta organización?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="accion" value="eliminar_organizacion">
+                                    <input type="hidden" name="organizacion_id" value="{{ org.id }}">
+
+                                    <button class="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-700">
+                                        Eliminar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="py-6 text-center text-slate-500">
+                                No hay organizaciones registradas.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="pantalla-notificaciones" class="pantalla-admin hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-lg mb-4">📢 Nueva notificación</h3>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="enviar_notificacion">
+
+                <label class="block text-sm font-bold mb-1">Destinatarios</label>
+
+                <select id="destinatario"
+                        name="destinatario"
+                        onchange="mostrarDestino()"
+                        class="w-full p-2 border border-slate-300 rounded mb-4 bg-white">
+
+                    <option value="todos">Todos los usuarios</option>
+                    <option value="sector">Por sector</option>
+                    <option value="organizacion">Por organización</option>
+
+                </select>
+
+                <div id="selector-sector" class="hidden mb-4">
+                    <label class="block text-sm font-bold mb-1">
+                        Sector
+                    </label>
+
+                    <select name="sector_id"
+                            class="w-full p-2 border border-slate-300 rounded bg-white">
+
+                        <option value="">Seleccione un sector</option>
+
+                        {% for sector in sectores %}
+                        <option value="{{ sector.id }}">
+                            {{ sector.nombre }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div id="selector-organizacion" class="hidden mb-4">
+                    <label class="block text-sm font-bold mb-1">
+                        Organización
+                    </label>
+
+                    <select name="organizacion_id"
+                            class="w-full p-2 border border-slate-300 rounded bg-white">
+
+                        <option value="">Seleccione una organización</option>
+
+                        {% for org in organizaciones %}
+                        <option value="{{ org.id }}">
+                            {{ org.nombre }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <label class="block text-sm font-bold mb-1">Título</label>
+                <input type="text" name="titulo" placeholder="Ej: Aviso municipal"
+                       class="w-full p-2 border border-slate-300 rounded mb-4">
+
+                <label class="block text-sm font-bold mb-1">Mensaje</label>
+                <textarea name="mensaje" rows="5" placeholder="Escribe el mensaje para los vecinos..."
+                          class="w-full p-2 border border-slate-300 rounded mb-4"></textarea>
+
+                <button class="w-full bg-green-600 text-white py-2 rounded font-bold">
+                    🚀 Enviar notificación
+                </button>
+
+                <p class="text-xs text-slate-400 mt-3">
+                    Interfaz lista. En el siguiente paso conectamos Firebase Admin SDK para envío real.
+                </p>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg">📱 Dispositivos registrados</h3>
+                    <p class="text-sm text-slate-500">Celulares que recibirán notificaciones push.</p>
+                </div>
+
+                <div class="flex gap-2">
+                    <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-bold">
+                        Total: {{ total_dispositivos|default:0 }}
+                    </span>
+                    <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
+                        Activos: {{ dispositivos_activos|default:0 }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-left text-sm">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                        <tr>
+                            <th class="py-3 px-4">ID</th>
+                            <th class="py-3 px-4">Persona ID</th>
+                            <th class="py-3 px-4">Plataforma</th>
+                            <th class="py-3 px-4">Activo</th>
+                            <th class="py-3 px-4">Último acceso</th>
+                            <th class="py-3 px-4">Token</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100">
+                        {% for dispositivo in dispositivos %}
+                        <tr class="hover:bg-slate-50">
+                            <td class="py-3 px-4 font-mono">{{ dispositivo.id }}</td>
+                            <td class="py-3 px-4 font-bold">{{ dispositivo.persona_id }}</td>
+                            <td class="py-3 px-4">{{ dispositivo.plataforma|default:"-" }}</td>
+                            <td class="py-3 px-4">
+                                {% if dispositivo.activo %}
+                                    <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Activo</span>
+                                {% else %}
+                                    <span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 font-mono text-xs">{{ dispositivo.ultimo_acceso }}</td>
+                            <td class="py-3 px-4 font-mono text-xs text-slate-400">
+                                {{ dispositivo.fcm_token|truncatechars:35 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="py-6 text-center text-slate-500">
+                                No hay dispositivos registrados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="p-5 border-t border-slate-100">
+                    <h3 class="font-bold text-slate-800 text-lg mb-4">🕓 Historial de notificaciones</h3>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                                <tr>
+                                    <th class="py-3 px-4">Fecha</th>
+                                    <th class="py-3 px-4">Destino</th>
+                                    <th class="py-3 px-4">Título</th>
+                                    <th class="py-3 px-4">Detalle</th>
+                                    <th class="py-3 px-4">Destinatarios</th>
+                                    <th class="py-3 px-4">Enviados</th>
+                                    <th class="py-3 px-4">Errores</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y divide-slate-100">
+                                {% for noti in notificaciones_enviadas %}
+                                <tr>
+                                    <td class="py-3 px-4 font-mono text-xs">{{ noti.fecha }}</td>
+
+                                    <td class="py-3 px-4">{{ noti.destinatario }}</td>
+
+                                    <td class="py-3 px-4 font-bold">
+                                        {{ noti.titulo }}
+                                    </td>
+
+                                    <td class="py-3 px-4">
+                                        <button
+                                            onclick="verNotificacion(
+                                                '{{ noti.fecha|escapejs }}',
+                                                '{{ noti.destinatario|escapejs }}',
+                                                '{{ noti.titulo|escapejs }}',
+                                                '{{ noti.mensaje|escapejs }}',
+                                                '{{ noti.total_destinatarios }}',
+                                                '{{ noti.enviados }}',
+                                                '{{ noti.errores }}'
+                                            )"
+                                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-bold">
+                                            👁 Ver detalle
+                                        </button>
+                                    </td>
+
+                                    <td class="py-3 px-4">
+                                        {{ noti.total_destinatarios }}
+                                    </td>
+
+                                    <td class="py-3 px-4">{{ noti.enviados }}</td>
+
+                                    <td class="py-3 px-4">{{ noti.errores }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="py-6 text-center text-slate-500">
+                                        No hay notificaciones registradas.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="modalNotificacion"
+     class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
+
+        <div class="flex justify-between items-center p-5 border-b">
+            <h3 class="text-xl font-bold text-slate-800">
+                📢 Detalle de Notificación
+            </h3>
+
+            <button
+                onclick="cerrarNotificacion()"
+                class="text-slate-500 hover:text-red-600 text-xl">
+                ✕
+            </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+
+            <div>
+                <strong>Fecha:</strong>
+                <span id="noti_fecha"></span>
+            </div>
+
+            <div>
+                <strong>Destino:</strong>
+                <span id="noti_destino"></span>
+            </div>
+
+            <div>
+                <strong>Título:</strong>
+                <span id="noti_titulo"></span>
+            </div>
+
+            <div>
+                <strong>Mensaje:</strong>
+
+                <div
+                    id="noti_mensaje"
+                    class="mt-2 p-4 bg-slate-50 rounded border">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+
+                <div class="bg-blue-50 p-3 rounded">
+                    <div class="text-xs text-slate-500">
+                        Destinatarios
+                    </div>
+
+                    <div
+                        id="noti_total"
+                        class="text-2xl font-bold text-blue-700">
+                    </div>
+                </div>
+
+                <div class="bg-green-50 p-3 rounded">
+                    <div class="text-xs text-slate-500">
+                        Enviados
+                    </div>
+
+                    <div
+                        id="noti_enviados"
+                        class="text-2xl font-bold text-green-700">
+                    </div>
+                </div>
+
+                <div class="bg-red-50 p-3 rounded">
+                    <div class="text-xs text-slate-500">
+                        Errores
+                    </div>
+
+                    <div
+                        id="noti_errores"
+                        class="text-2xl font-bold text-red-700">
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div id="pantalla-logs" class="pantalla-admin hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">📊 Auditoría administrativa</h3>
+                <p class="text-sm text-slate-500">Últimas acciones realizadas en el panel administrativo.</p>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+                <thead class="bg-slate-100 text-slate-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">Usuario</th>
+                        <th class="py-3 px-4">Acción</th>
+                        <th class="py-3 px-4">Módulo</th>
+                        <th class="py-3 px-4">Detalle</th>
+                        <th class="py-3 px-4">IP</th>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-slate-100">
+                    {% for log in logs_admin %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3 px-4 font-mono text-xs">{{ log.fecha }}</td>
+                        <td class="py-3 px-4 font-bold">{{ log.usuario_sistema|default:"Sistema" }}</td>
+                        <td class="py-3 px-4">
+                            <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">
+                                {{ log.accion }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">{{ log.modulo }}</td>
+                        <td class="py-3 px-4">{{ log.detalle }}</td>
+                        <td class="py-3 px-4 font-mono text-xs text-slate-500">{{ log.ip }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-6 text-center text-slate-500">
+                            No hay registros de auditoría.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostrarDestino() {
+
+    const destino =
+        document.getElementById('destinatario').value;
+
+    document
+        .getElementById('selector-sector')
+        .classList.add('hidden');
+
+    document
+        .getElementById('selector-organizacion')
+        .classList.add('hidden');
+
+    if (destino === 'sector') {
+        document
+            .getElementById('selector-sector')
+            .classList.remove('hidden');
+    }
+
+    if (destino === 'organizacion') {
+        document
+            .getElementById('selector-organizacion')
+            .classList.remove('hidden');
+    }
+}
+</script>
+
+<script>
+    function mostrarDestino() {
+        const destino = document.getElementById('destinatario').value;
+
+        document.getElementById('selector-sector').classList.add('hidden');
+        document.getElementById('selector-organizacion').classList.add('hidden');
+
+        if (destino === 'sector') {
+            document.getElementById('selector-sector').classList.remove('hidden');
+        }
+
+        if (destino === 'organizacion') {
+            document.getElementById('selector-organizacion').classList.remove('hidden');
+        }
+    }
+
+    function verNotificacion(
+        fecha,
+        destino,
+        titulo,
+        mensaje,
+        total,
+        enviados,
+        errores
+    ) {
+        document.getElementById('noti_fecha').innerText = fecha;
+        document.getElementById('noti_destino').innerText = destino;
+        document.getElementById('noti_titulo').innerText = titulo;
+        document.getElementById('noti_mensaje').innerText = mensaje;
+
+        document.getElementById('noti_total').innerText = total;
+        document.getElementById('noti_enviados').innerText = enviados;
+        document.getElementById('noti_errores').innerText = errores;
+
+        document.getElementById('modalNotificacion').classList.remove('hidden');
+    }
+
+    function cerrarNotificacion() {
+        document.getElementById('modalNotificacion').classList.add('hidden');
+    }
+</script>
+
+{% endblock %}

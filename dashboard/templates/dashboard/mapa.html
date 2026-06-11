@@ -1,0 +1,101 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Mapa Territorial - San Pedro Conecta{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<header class="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+        <h2 class="text-3xl font-bold text-slate-800">Mapa Territorial</h2>
+        <p class="text-slate-500">Reportes ciudadanos georreferenciados por estado municipal.</p>
+    </div>
+
+    <a href="{% url 'dashboard_reportes' %}" class="bg-green-600 text-white px-5 py-2 rounded-lg font-bold shadow hover:bg-green-700">
+        Ver reportes
+    </a>
+</header>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+    <div class="lg:col-span-3">
+        <div id="map" class="w-full h-[700px] rounded-xl border shadow"></div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-fit">
+        <h3 class="font-bold text-slate-800 mb-4">Leyenda</h3>
+
+        <div class="space-y-3">
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full bg-orange-500 block"></span>
+                <span class="text-sm text-slate-700 font-medium">No enviado / Pendiente</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full bg-blue-500 block"></span>
+                <span class="text-sm text-slate-700 font-medium">En proceso</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full bg-green-500 block"></span>
+                <span class="text-sm text-slate-700 font-medium">Resuelto</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="w-4 h-4 rounded-full bg-gray-500 block"></span>
+                <span class="text-sm text-slate-700 font-medium">Otro estado</span>
+            </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200">
+            <p class="text-xs text-slate-500">
+                Cada marcador representa un reporte ciudadano registrado desde la app.
+            </p>
+        </div>
+    </div>
+
+</div>
+
+{{ puntos|json_script:"puntos-data" }}
+
+<script>
+    const puntos = JSON.parse(document.getElementById('puntos-data').textContent);
+
+    const map = L.map('map').setView([-33.89, -71.46], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenStreetMap'
+    }).addTo(map);
+
+    function colorHex(color) {
+        if (color === 'green') return '#16a34a';
+        if (color === 'blue') return '#2563eb';
+        if (color === 'orange') return '#f59e0b';
+        return '#64748b';
+    }
+
+    puntos.forEach((punto) => {
+        const marker = L.circleMarker([punto.latitud, punto.longitud], {
+            radius: 9,
+            color: colorHex(punto.color),
+            fillColor: colorHex(punto.color),
+            fillOpacity: 0.85,
+            weight: 2
+        }).addTo(map);
+
+        marker.bindPopup(`
+            <div style="min-width:180px">
+                <strong>REP-${punto.id}</strong><br>
+                <span>${punto.titulo}</span><br>
+                <small>Estado: ${punto.estado}</small><br><br>
+                <a href="/dashboard/reportes/${punto.id}/">Ver detalle</a>
+            </div>
+        `);
+    });
+</script>
+
+{% endblock %}

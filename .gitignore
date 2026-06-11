@@ -7,5 +7,5 @@ staticfiles/
 media/
 db.sqlite3
 .DS_Store
-.env
+
 firebase-admin.json

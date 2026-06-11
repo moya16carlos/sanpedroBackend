@@ -26,8 +26,21 @@ SECRET_KEY = 'django-insecure-1s1x6qs67@m5um2_)_-*iy%em%ja&74_&*+9w*4inv)0h%oa4s
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "sanpedro.liceosp.cl,localhost,127.0.0.1"
+).split(",")
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://sanpedro.liceosp.cl",
+    "http://sanpedro.liceosp.cl",
+]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
 

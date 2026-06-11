@@ -26,13 +26,6 @@ services:
       gunicorn config.wsgi:application --bind 0.0.0.0:8000
       "
 
-    networks:
-      - traefik
-
 volumes:
   static_data:
   media_data:
-
-networks:
-  traefik:
-    external: true
